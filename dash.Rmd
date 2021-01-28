@@ -1,0 +1,139 @@
+---
+title: "NFLWP"
+resource_files:
+- model-2.RDS
+- model-3.RDS
+- model-4.RDS
+- model-1.RDS
+runtime: shiny
+output: flexdashboard::flex_dashboard
+---
+
+
+```{r global, include = F}
+# setup, calling packages
+suppressMessages(library(dplyr))
+suppressMessages(library(tidyr))
+suppressMessages(library(RSNNS))
+suppressMessages(library(caret))
+suppressMessages(library(ggplot2))
+suppressMessages(library(shiny))
+suppressMessages(library(DT))
+
+# source helpers
+source("utils.R")
+# read in model/scales -- keeping it small/reasonable here
+model_info = load_mlp('model', 1)
+```
+
+Game State:
+=====================================
+
+Column {data-width=550}
+-------------------------------------
+
+```{r}
+# shiny inputs defined here
+sliderInput('yardline_100', 
+            h5('Yardline'), 
+            min = 1, 
+            max = 99, 
+            value = 75, 
+            step = 1, 
+            round = T, 
+            dragRange = TRUE)
+
+sliderInput('down', 
+            h5('Down'), 
+            min = 1, 
+            max = 4, 
+            value = 1,
+            step = 1, 
+            round = T, 
+            dragRange = TRUE)
+
+sliderInput('ydstogo', 
+            h5('Distance'), 
+            min = 1, 
+            max = 20, 
+            value = 10,
+            step = 1, 
+            round = T, 
+            dragRange = TRUE)
+
+sliderInput('game_min_remaining', 
+            h5('Minutes Remaining (N/60)'), 
+            min = 0, 
+            max = 60, 
+            value = 60,
+            step = .1, 
+            round = F, 
+            dragRange = TRUE)
+```
+
+Column {data-width=550}
+-------------------------------------
+```{r}
+numericInput("posteam_score",
+             h5("Offense Points"), 
+             value = 0)
+
+numericInput("defteam_score",
+             h5("Defense Points"), 
+             value = 0)
+
+sliderInput('posteam_timeouts_remaining', 
+            h5('Offense TO'), 
+            min = 0, 
+            max = 3, 
+            value = 3, 
+            step = 1, 
+            round = T, 
+            dragRange = TRUE)
+
+sliderInput('defteam_timeouts_remaining', 
+            h5('Defense TO'), 
+            min = 0, 
+            max = 3, 
+            value = 3, 
+            step = 1, 
+            round = T, 
+            dragRange = TRUE)
+
+
+
+```
+
+
+```{r}
+xvar_dict <- reactive({list(
+  down=input$down,
+  ydstogo=input$ydstogo,
+  yardline_100=input$yardline_100,
+  posteam_score=input$posteam_score,
+  defteam_score=input$defteam_score,
+  game_min_remaining=input$game_min_remaining,
+  posteam_timeouts_remaining=input$posteam_timeouts_remaining,
+  defteam_timeouts_remaining=input$defteam_timeouts_remaining
+)})
+
+comparison_df <- reactive({
+  data.frame('Scenario' = c("Current", "Timeout", "Delay"),
+             'Win_Probability' = c(evaluate_gamestate(xvar_dict(), model_info[[1]], model_info[[2]]),
+                                   evaluate_dog(xvar_dict(), model_info[[1]], model_info[[2]])[[1]],
+                                   evaluate_dog(xvar_dict(), model_info[[1]], model_info[[2]])[[2]]
+                                   )
+             )
+})
+```
+
+
+Row
+-------------------------------------
+```{r}
+renderTable({
+  comparison_df()
+})
+```
+
+
